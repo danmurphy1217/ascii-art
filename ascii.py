@@ -1,6 +1,7 @@
 from PIL import Image
 import numpy as np
 from colorama import Fore
+import sys
 
 class Ascii:
     def __init__(self, path):
@@ -45,24 +46,42 @@ class Ascii:
         
         return [pixels[i:i+img.width] for i in range(0, len(pixels), img.width)]       
 
-    @classmethod        
-    def brightness(cls, matrix):
+    @classmethod   # won't be changed     
+    def brightness(cls, matrix, eq):
         """
         Converts each tuple with the matrix into a 'brightness' value.
 
         Loops through the rows and columns of the matrix and converts
         each tuple into the brightness value (calculated as the luminosity)
         of the R, G, and B values in the tuple -> .21R + .72G + .07B
+
+        Parameters
+        ----------
+        matrix : (2-d list)
+            the matrix of pixel vaues
+        eq : (str)
+            the type of equation to use for converting a tuple of pixel values to brightness.
+
+        Returns
+        ----------
+        Returns a matrix of brightness values
         """
-        # return [map(lambda R, G, B: .21*R + .72*G + .07*B, l) for l in matrix]
         print("Construction brightness matrix...")
-        return [list(map( lambda tup: .21*tup[0] + .72*tup[2] + .07*tup[2], l)) for l in matrix]
-    @classmethod    
+        if eq.lower() == "luminosity":
+            return [list(map( lambda tup: .21*tup[0] + .72*tup[1] + .07*tup[2], l)) for l in matrix]
+        elif eq.lower() == "average":
+            return [list(map( lambda tup: (tup[0] + tup[1] + tup[2])/3, l)) for l in matrix]
+        elif eq.lower() == "lightness":
+            return [list(map( lambda tup: (max(tup) + min(tup))/2, l)) for l in matrix]
+        else:
+            return "Error: Try `lightness`, `average`, or `luminosity`."
+
+    @classmethod # won't be changed
     def normalize(cls, brightness_matrix, maximum, minimum):
         """Takes a brightness matrix as input and normalizes the values between 0 and 1 (Min-Max Normalization)."""
         return [(val - minimum)/(maximum - minimum) for row in brightness_matrix for val in row]
     
-    @classmethod
+    @classmethod # won't be changed
     def brightnessToAscii(cls, brightness_mat):
         """
         Returns each value in a brightness matrix mapped
@@ -110,9 +129,7 @@ class Ascii:
                 else:
                     index_val = list(buckets).index(val)
                     return ASCII[index_val -1]
-        # ascii_str = []
-        # [ascii_str.append(str(bucketHelper(abs_min, abs_max, brightness, ASCII, buckets))) for val in brightness_mat for brightness in val]
-        # return "".join(ascii_str)
+                
         s = ""
         for val in brightness_mat:
             s += asciiChar(abs_min, abs_max, val , ASCII, buckets) 
@@ -124,16 +141,17 @@ class Ascii:
             
 
 if __name__ == "__main__":
-    jpg_name = input("Enter jpg to convert to ASCII: ").lower().strip()    
+    jpg_name = sys.argv[2].lower().strip()    
     ascii_art = Ascii(jpg_name)
     
     # matrix where each  pixel is an RGB tuple.
     img_mat = ascii_art.toMatrix(height = ascii_art.getHeight(), width = ascii_art.getWidth())
     
-    # ASCII is only converned with the overall brightness of each value.
+    # ASCII is only converted with the overall brightness of each value.
     # So, now we will convert each tuple into a single value that signals how 'bright' each pixel is
     # and then normalize these values
-    bright_mat = ascii_art.brightness(matrix = img_mat)   
+    brightness_eq = sys.argv[3].lower().strip()
+    bright_mat = ascii_art.brightness(matrix = img_mat, eq = brightness_eq)   
     print("Completed creating brightness matrix") 
     normalized_brightness_mat = ascii_art.normalize(bright_mat, maximum = ascii_art.getMax(bright_mat), minimum=ascii_art.getMin(bright_mat))
     print("Completed converting brightness -> normalized values")
