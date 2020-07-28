@@ -1,5 +1,6 @@
 from PIL import Image
 import numpy as np
+from colorama import Fore
 
 class Ascii:
     def __init__(self, path):
@@ -12,6 +13,13 @@ class Ascii:
     def getHeight(self):
         """Returns the height of an image."""
         return Image.open(self.path).height
+
+    def getMin(self, matrix):
+        return min(map(min, matrix))
+
+    def getMax(self, matrix):
+        return max(map(max, matrix))
+
     def toMatrix(self, height, width):
         """
         Converts an Image into a matrix of tuples, where each tuple represents a pixel value.
@@ -33,17 +41,10 @@ class Ascii:
         A matrix representation of the image.
         """
         img = Image.open(self.path)
-
-        img_mat = [] # matrix of images pixels
+        pixels = list(img.getdata())                
         
-        # loop through width of image
-        for i in range(width):
-            column = []    
-            for j in range(height):
-                column.append(img.getpixel((i, j))) # creating a column for the matrix
-            img_mat.append(column) # add that column to the matrix           
-        print(f"Successfully built a pixel matrix of height {height} and width {width}")
-        return img_mat 
+        return [pixels[i:i+img.width] for i in range(0, len(pixels), img.width)]       
+
     @classmethod        
     def brightness(cls, matrix):
         """
@@ -56,6 +57,10 @@ class Ascii:
         # return [map(lambda R, G, B: .21*R + .72*G + .07*B, l) for l in matrix]
         print("Construction brightness matrix...")
         return [list(map( lambda tup: .21*tup[0] + .72*tup[2] + .07*tup[2], l)) for l in matrix]
+    @classmethod    
+    def normalize(cls, brightness_matrix, maximum, minimum):
+        """Takes a brightness matrix as input and normalizes the values between 0 and 1 (Min-Max Normalization)."""
+        return [(val - minimum)/(maximum - minimum) for row in brightness_matrix for val in row]
     
     @classmethod
     def brightnessToAscii(cls, brightness_mat):
@@ -73,11 +78,11 @@ class Ascii:
         A matrix of ASCII characters.
         """
         ASCII = "`^\",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"
-        abs_min = min(min(brightness_mat))
-        abs_max = max(max(brightness_mat))
+        abs_min = min(brightness_mat)
+        abs_max = max(brightness_mat)
         # create 65 buckets to group character brightness into
-        buckets = np.arange(abs_min, abs_max, (abs_max - abs_min)/len(ASCII))
-        def bucketHelper(min, max, brightness, ascii_chars, buckets):
+        buckets = np.arange(abs_min, abs_max+0.1, (abs_max - abs_min)/len(ASCII))
+        def asciiChar(min, max, brightness, ascii_chars, buckets):
             """
             assign an ascii character to a brightness value and return it.
 
@@ -105,22 +110,40 @@ class Ascii:
                 else:
                     index_val = list(buckets).index(val)
                     return ASCII[index_val -1]
-        ascii_str = []
-        [ascii_str.append(str(bucketHelper(abs_min, abs_max, brightness, ASCII, buckets))) for val in brightness_mat for brightness in val]
-        return "".join(ascii_str)
-            
+        # ascii_str = []
+        # [ascii_str.append(str(bucketHelper(abs_min, abs_max, brightness, ASCII, buckets))) for val in brightness_mat for brightness in val]
+        # return "".join(ascii_str)
+        s = ""
+        for val in brightness_mat:
+            s += asciiChar(abs_min, abs_max, val , ASCII, buckets) 
+        return s
+
+    def print_ascii_matrix(self, ascii_matrix, text_color):
+        line = [p for row in ascii_matrix for p in row]
+        print(text_color + "".join(line))
             
 
 if __name__ == "__main__":
-    ascii_art = Ascii("Ask-Logo-Small.jpg")
+    jpg_name = input("Enter jpg to convert to ASCII: ").lower().strip()    
+    ascii_art = Ascii(jpg_name)
     
-    # matrix where each pixel is an RGB tuple.
+    # matrix where each  pixel is an RGB tuple.
     img_mat = ascii_art.toMatrix(height = ascii_art.getHeight(), width = ascii_art.getWidth())
     
     # ASCII is only converned with the overall brightness of each value.
     # So, now we will convert each tuple into a single value that signals how 'bright' each pixel is
-    bright_mat = ascii_art.brightness(matrix = img_mat)
-    print(ascii_art.brightnessToAscii(bright_mat))
+    # and then normalize these values
+    bright_mat = ascii_art.brightness(matrix = img_mat)   
+    print("Completed creating brightness matrix") 
+    normalized_brightness_mat = ascii_art.normalize(bright_mat, maximum = ascii_art.getMax(bright_mat), minimum=ascii_art.getMin(bright_mat))
+    print("Completed converting brightness -> normalized values")
 
     # Now, convert brightness matrix -> ASCII character matrix
     # We need to decide how to map brightnesses -> characters
+    ascii_mat = ascii_art.brightnessToAscii(normalized_brightness_mat)
+    print("Completed converting normalized values -> ascii")
+
+    ascii_art.print_ascii_matrix(ascii_mat, Fore.GREEN)
+
+
+    
